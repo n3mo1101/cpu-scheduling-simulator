@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+.hatch-idle {
+  background-color: #e2e8f0;
+  background-image: repeating-linear-gradient(
+    135deg,
+    #cbd5e1 0,
+    #cbd5e1 6px,
+    #e2e8f0 6px,
+    #e2e8f0 12px
+  );
+}
