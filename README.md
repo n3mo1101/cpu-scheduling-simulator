@@ -1,4 +1,4 @@
-# CPU Scheduling Simulator
+# CPU Scheduling Simulator (Python/FastAPI version)
 
 A full-stack CPU scheduling simulator for First-Come, First-Served (FCFS) and non-preemptive Shortest Job First (SJF). Enter processes in the browser or upload a CSV or JSON file, run a simulation, and inspect a proportional Gantt chart, per-process timing metrics, and CPU averages.
 
