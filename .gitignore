@@ -225,6 +225,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-
-# Documents
-PROJECT.md
+# Agent
+.docs
+.agents
+skills-lock.json
