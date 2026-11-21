@@ -2,6 +2,10 @@
 
 import type { ApiErrorItem, SimulateRequest, SimulateResponse } from "../types";
 
+/** Message shown whenever the backend cannot be reached. */
+export const NETWORK_ERROR_MESSAGE =
+  "Could not reach the server. Is the backend running on port 8000?";
+
 /** The backend rejected the request with a list of validation problems. */
 export class ApiValidationError extends Error {
   readonly errors: ApiErrorItem[];
@@ -64,9 +68,7 @@ export async function simulate(request: SimulateRequest): Promise<SimulateRespon
       body: JSON.stringify(request),
     });
   } catch {
-    throw new ApiNetworkError(
-      "Could not reach the server. Is the backend running on port 8000?",
-    );
+    throw new ApiNetworkError(NETWORK_ERROR_MESSAGE);
   }
 
   if (!response.ok) {
@@ -82,9 +84,7 @@ export async function simulate(request: SimulateRequest): Promise<SimulateRespon
     }
 
     if (response.status >= 500 && body === null) {
-      throw new ApiNetworkError(
-        "Could not reach the server. Is the backend running on port 8000?",
-      );
+      throw new ApiNetworkError(NETWORK_ERROR_MESSAGE);
     }
 
     throw new ApiServerError(
@@ -94,4 +94,14 @@ export async function simulate(request: SimulateRequest): Promise<SimulateRespon
 
   const body: unknown = await response.json();
   return body as SimulateResponse;
+}
+
+/** Check whether the backend is reachable. Never throws. */
+export async function checkHealth(): Promise<boolean> {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

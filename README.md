@@ -9,13 +9,17 @@ The scheduling engine is pure Python with no web imports. The API is FastAPI wit
 - FCFS and non-preemptive SJF scheduling
 - Up to 100 processes per run
 - PID, arrival time, burst time, and reserved priority input
-- Gantt chart with proportional segment widths, idle gaps, and stable per-PID colours
+- Two-column dark interface: a 440 px input panel and a fluid results panel
+- Compact process table with a count stepper, add row, and remove row controls
+- Segmented FCFS and SJF picker with a description of the selected policy
+- Gantt chart with proportional segment widths, a ticked time axis, hover intervals, idle hatching, and per-PID colours
 - Per-process completion, turnaround, waiting, and response times
 - Average waiting time and average turnaround time, rounded to two decimals
 - Total simulated time
-- CSV and JSON file upload with specific parse errors and a 1 MB limit
+- CSV and JSON drag-and-drop upload with specific parse errors and a 1 MB limit
 - Backend validation with row-specific messages shown inline and in a summary banner
-- Loading state, network error message, and responsive layout
+- Backend status chip, loading state, unreachable-server message, and responsive layout
+- Ctrl + Enter (or Cmd + Enter) to run a simulation
 
 ## Tech stack
 
@@ -142,16 +146,20 @@ ruff format --check .
 
 ## Usage
 
-1. Choose FCFS or SJF from the algorithm dropdown.
-2. Set the number of processes (1 to 100). Press Enter or leave the field to apply the new count. Existing row data is kept.
-3. Enter a PID, arrival time, burst time, and priority for each row. PIDs are suggested as P1, P2, and so on, but can be edited.
-4. Optionally upload a CSV or JSON file, or click "Load sample data".
-5. Click "Run simulation".
-6. Review the average metrics, the Gantt chart, and the per-process results table.
+1. Choose FCFS or SJF from the segmented algorithm control. The line below it describes the selected policy.
+2. Set the process count with the − and + stepper, or use "Add process" and the row remove button. Existing row data is kept. The limit is 1 to 100 processes.
+3. Enter a PID, arrival time, burst time, and priority for each row. PIDs are suggested as P1, P2, and so on, but can be edited. Priority uses a dashed, dimmed field because it is reserved.
+4. Optionally drop a CSV or JSON file on the upload zone, browse for one, or click "Load sample data".
+5. Click "Run simulation", or press Ctrl + Enter (Cmd + Enter on macOS).
+6. Review the Gantt chart, the three-cell metrics strip, and the per-process results table.
 
-Priority is collected and validated, but neither algorithm uses it. It is labelled as reserved in the form.
+The input rows, Gantt blocks, legend, and results table share one colour per PID. Hover or focus a Gantt block to read its interval, such as "P3 ran from 8 to 16 (8 units)".
 
-The "Clear" button resets the form to one empty process row and removes any results.
+Priority is collected and validated, but neither algorithm uses it.
+
+The "Clear all" button resets the form to one empty process row and removes any results, errors, and notices. The selected algorithm is kept.
+
+The header shows a backend status chip: checking, connected, or offline. It is checked on load, when the window regains focus, and after each simulation attempt.
 
 ## API contract
 

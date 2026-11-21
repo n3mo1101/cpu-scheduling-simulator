@@ -1,66 +1,111 @@
-/** Process count and the editable process rows. */
+/** Compact process table with a count stepper and per-row controls. */
 
 import type { ApiErrorItem, ProcessRow } from "../types";
+import { processColor } from "../utils/colors";
 
 type ProcessField = keyof ProcessRow;
 
-interface InputFieldProps {
+const MIN_PROCESSES = 1;
+const MAX_PROCESSES = 100;
+
+const FIELD_LABELS: Record<string, string> = {
+  pid: "Process ID",
+  arrival: "Arrival time",
+  burst: "Burst time",
+  priority: "Priority",
+};
+
+interface CellProps {
   id: string;
   label: string;
   value: string;
-  type: "text" | "number";
-  min?: number;
-  max?: number;
-  step?: number;
-  placeholder?: string;
+  placeholder: string;
+  inputMode: "text" | "numeric";
   errors: string[];
+  describedBy?: string;
   disabled: boolean;
+  dimmed?: boolean;
   onChange: (value: string) => void;
 }
 
-function InputField({
+function Cell({
   id,
   label,
   value,
-  type,
-  min,
-  max,
-  step,
   placeholder,
+  inputMode,
   errors,
+  describedBy,
   disabled,
+  dimmed = false,
   onChange,
-}: InputFieldProps) {
+}: CellProps) {
   const hasError = errors.length > 0;
 
   return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-600">
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        placeholder={placeholder}
-        disabled={disabled}
-        aria-invalid={hasError}
-        aria-describedby={hasError ? `${id}-error` : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        className={`w-full rounded-md border px-2.5 py-2 text-sm shadow-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
-          hasError
-            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-            : "border-slate-300 focus:border-blue-500 focus:ring-blue-200"
-        }`}
-      />
-      {hasError && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-red-700">
-          {errors.join(" ")}
-        </p>
-      )}
+    <input
+      id={id}
+      aria-label={label}
+      value={value}
+      placeholder={placeholder}
+      inputMode={inputMode}
+      disabled={disabled}
+      aria-invalid={hasError}
+      aria-describedby={hasError ? describedBy : undefined}
+      onChange={(event) => onChange(event.target.value)}
+      className={`h-9 w-full min-w-0 rounded-lg border bg-field px-2 text-sm tabular-nums outline-none transition-colors placeholder:text-faint/70 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+        hasError
+          ? "border-error/80 text-ink focus:border-error focus:ring-error/25"
+          : dimmed
+            ? "border-dashed border-line-strong text-faint focus:border-line-strong focus:ring-primary/20"
+            : "border-line-soft text-ink focus:border-primary/70 focus:ring-primary/20"
+      }`}
+    />
+  );
+}
+
+interface StepperProps {
+  count: number;
+  disabled: boolean;
+  onChange: (count: number) => void;
+}
+
+function Stepper({ count, disabled, onChange }: StepperProps) {
+  const stepClass =
+    "flex h-7 w-7 items-center justify-center rounded-md border border-line-soft bg-field text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        aria-label="Remove one process"
+        disabled={disabled || count <= MIN_PROCESSES}
+        onClick={() => onChange(count - 1)}
+        className={stepClass}
+      >
+        <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+          <path d="M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
+      <span className="min-w-5 text-center text-sm font-medium tabular-nums text-ink">
+        {count}
+      </span>
+      <button
+        type="button"
+        aria-label="Add one process"
+        disabled={disabled || count >= MAX_PROCESSES}
+        onClick={() => onChange(count + 1)}
+        className={stepClass}
+      >
+        <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+          <path
+            d="M6 2v8M2 6h8"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -70,97 +115,139 @@ interface ProcessFormProps {
   errors: ApiErrorItem[];
   disabled: boolean;
   onChange: (index: number, field: ProcessField, value: string) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onCountChange: (count: number) => void;
 }
 
-/** Render one labelled, editable card per process. */
-export default function ProcessForm({ rows, errors, disabled, onChange }: ProcessFormProps) {
+/** Render one editable table row per process, plus add, remove, and count controls. */
+export default function ProcessForm({
+  rows,
+  errors,
+  disabled,
+  onChange,
+  onAdd,
+  onRemove,
+  onCountChange,
+}: ProcessFormProps) {
   const messagesFor = (row: number, field: ProcessField | null): string[] =>
     errors
       .filter((error) => error.row === row && error.field === field)
       .map((error) => error.message);
 
+  const fields: Array<{
+    field: ProcessField;
+    placeholder: string;
+    inputMode: "text" | "numeric";
+    dimmed?: boolean;
+  }> = [
+    { field: "pid", placeholder: "P", inputMode: "text" },
+    { field: "arrival", placeholder: "0", inputMode: "numeric" },
+    { field: "burst", placeholder: "1", inputMode: "numeric" },
+    { field: "priority", placeholder: "0", inputMode: "numeric", dimmed: true },
+  ];
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold text-slate-900">Processes</h2>
-        <p className="text-xs text-slate-500">
-          Priority is reserved and is not used by FCFS or SJF.
-        </p>
+    <section aria-labelledby="processes-heading">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h2 id="processes-heading" className="text-sm font-semibold text-ink">
+            Processes
+          </h2>
+          <p className="mt-0.5 text-xs text-faint">
+            Priority is reserved and not used by FCFS or SJF.
+          </p>
+        </div>
+        <Stepper count={rows.length} disabled={disabled} onChange={onCountChange} />
       </div>
 
-      {rows.map((row, index) => {
-        const rowNumber = index + 1;
-        const rowErrors = messagesFor(rowNumber, null);
+      <div className="grid grid-cols-[8px_minmax(0,1.15fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_26px] items-center gap-x-1.5 px-0.5">
+        <span aria-hidden="true" />
+        {["PID", "Arrival", "Burst", "Priority"].map((label) => (
+          <span key={label} className="text-[11px] font-medium uppercase tracking-wide text-faint">
+            {label}
+          </span>
+        ))}
+        <span aria-hidden="true" />
 
-        return (
-          <div
-            key={index}
-            className="rounded-lg border border-slate-200 bg-slate-50/60 p-3"
-          >
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
-                {rowNumber}
-              </span>
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Process {rowNumber}
-              </span>
+        {rows.map((row, index) => {
+          const rowNumber = index + 1;
+          const rowErrorId = `row-${index}-error`;
+          const rowMessages = fields.flatMap(({ field }) => messagesFor(rowNumber, field));
+          const extraMessages = messagesFor(rowNumber, null);
+          const messages = [...rowMessages, ...extraMessages];
+
+          return (
+            <div key={index} className="contents">
+              <span
+                aria-hidden="true"
+                className="h-2 w-2 justify-self-center rounded-full"
+                style={{ backgroundColor: processColor(index) }}
+              />
+
+              {fields.map(({ field, placeholder, inputMode, dimmed }) => (
+                <Cell
+                  key={field}
+                  id={`${field}-${index}`}
+                  label={`${FIELD_LABELS[field]} for process ${rowNumber}`}
+                  value={row[field]}
+                  placeholder={field === "pid" ? `${placeholder}${rowNumber}` : placeholder}
+                  inputMode={inputMode}
+                  errors={messagesFor(rowNumber, field)}
+                  describedBy={rowErrorId}
+                  disabled={disabled}
+                  dimmed={dimmed}
+                  onChange={(value) => onChange(index, field, value)}
+                />
+              ))}
+
+              <button
+                type="button"
+                aria-label={`Remove process ${rowNumber}`}
+                disabled={disabled || rows.length <= MIN_PROCESSES}
+                onClick={() => onRemove(index)}
+                className="flex h-7 w-7 items-center justify-center justify-self-center rounded-md text-faint transition-colors hover:bg-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+                  <path
+                    d="M3 3l6 6M9 3l-6 6"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+
+              {messages.length > 0 && (
+                <p
+                  id={rowErrorId}
+                  role="alert"
+                  className="col-span-6 pb-1 text-xs leading-snug text-error"
+                >
+                  Row {rowNumber}: {messages.join(" ")}
+                </p>
+              )}
             </div>
+          );
+        })}
+      </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <InputField
-                id={`pid-${index}`}
-                label="Process ID"
-                value={row.pid}
-                type="text"
-                placeholder={`P${rowNumber}`}
-                errors={messagesFor(rowNumber, "pid")}
-                disabled={disabled}
-                onChange={(value) => onChange(index, "pid", value)}
-              />
-              <InputField
-                id={`arrival-${index}`}
-                label="Arrival time"
-                value={row.arrival}
-                type="number"
-                min={0}
-                step={1}
-                placeholder="0"
-                errors={messagesFor(rowNumber, "arrival")}
-                disabled={disabled}
-                onChange={(value) => onChange(index, "arrival", value)}
-              />
-              <InputField
-                id={`burst-${index}`}
-                label="Burst time"
-                value={row.burst}
-                type="number"
-                min={1}
-                step={1}
-                placeholder="1"
-                errors={messagesFor(rowNumber, "burst")}
-                disabled={disabled}
-                onChange={(value) => onChange(index, "burst", value)}
-              />
-              <InputField
-                id={`priority-${index}`}
-                label="Priority (reserved, not used by FCFS/SJF)"
-                value={row.priority}
-                type="number"
-                min={0}
-                step={1}
-                placeholder="0"
-                errors={messagesFor(rowNumber, "priority")}
-                disabled={disabled}
-                onChange={(value) => onChange(index, "priority", value)}
-              />
-            </div>
-
-            {rowErrors.length > 0 && (
-              <p className="mt-2 text-xs text-red-700">{rowErrors.join(" ")}</p>
-            )}
-          </div>
-        );
-      })}
-    </div>
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={disabled || rows.length >= MAX_PROCESSES}
+        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong py-2 text-xs font-medium text-muted transition-colors hover:border-primary/60 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+          <path
+            d="M6 2v8M2 6h8"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+        Add process
+      </button>
+    </section>
   );
 }

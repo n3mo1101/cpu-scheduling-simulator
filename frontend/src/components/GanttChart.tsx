@@ -1,85 +1,150 @@
-/** Proportional Gantt chart built from absolutely positioned divs. */
+/** Proportional Gantt chart with a legend, time axis, and interval readout. */
 
-import type { SimulateResponse } from "../types";
-
-const PALETTE = [
-  "#1d4ed8",
-  "#047857",
-  "#b45309",
-  "#6d28d9",
-  "#b91c1c",
-  "#0e7490",
-  "#4d7c0f",
-  "#be185d",
-  "#4338ca",
-  "#a16207",
-];
-
-function stableColor(pid: string): string {
-  let hash = 0;
-  for (const character of pid) {
-    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  }
-  return PALETTE[hash % PALETTE.length];
-}
+import { useState } from "react";
+import type { GanttSegment, SimulateResponse } from "../types";
+import { processColor } from "../utils/colors";
 
 interface GanttChartProps {
   result: SimulateResponse;
 }
 
-/** Render the CPU timeline, including idle gaps, with proportional widths. */
+interface Block {
+  segment: GanttSegment;
+  index: number;
+  color: string | null;
+  duration: number;
+}
+
+const MIN_BLOCK_WIDTH = 44;
+
+function describe(segment: GanttSegment): string {
+  if (segment.pid === "IDLE") {
+    return `Idle from ${segment.start} to ${segment.end} (${segment.end - segment.start} units)`;
+  }
+  return `${segment.pid} ran from ${segment.start} to ${segment.end} (${
+    segment.end - segment.start
+  } units)`;
+}
+
+/** Render the CPU timeline with proportional blocks and idle gaps. */
 export default function GanttChart({ result }: GanttChartProps) {
-  const total = Math.max(result.total_time, 1);
-  const minWidth = Math.max(560, result.gantt.length * 96);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const order = new Map(result.results.map((item, index) => [item.pid, index]));
+
+  const blocks: Block[] = result.gantt.map((segment, index) => ({
+    segment,
+    index,
+    color: segment.pid === "IDLE" ? null : processColor(order.get(segment.pid) ?? 0),
+    duration: Math.max(segment.end - segment.start, 1),
+  }));
+
+  const active = activeIndex === null ? null : result.gantt[activeIndex] ?? null;
+
+  const legend = result.results.map((item, index) => ({
+    key: item.pid,
+    label: item.pid,
+    color: processColor(index),
+  }));
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-slate-900">Gantt chart</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Segment widths are proportional to their duration. Idle gaps appear as hatched
-        blocks.
+    <section
+      aria-labelledby="gantt-heading"
+      className="rounded-[14px] border border-line-soft bg-panel p-4 sm:p-5"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="gantt-heading" className="text-sm font-semibold text-ink">
+            Gantt chart
+          </h2>
+          <p className="mt-0.5 text-xs text-faint">
+            CPU timeline, proportional to each interval.
+          </p>
+        </div>
+
+        <ul aria-label="Process legend" className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {legend.map((entry) => (
+            <li key={entry.key} className="flex items-center gap-1.5 text-[11px] text-muted">
+              <span
+                aria-hidden="true"
+                className="h-2 w-2 rounded-[2px]"
+                style={{ backgroundColor: entry.color }}
+              />
+              {entry.label}
+            </li>
+          ))}
+          <li className="flex items-center gap-1.5 text-[11px] text-muted">
+            <span aria-hidden="true" className="hatch-idle h-2 w-2 rounded-[2px]" />
+            Idle
+          </li>
+        </ul>
+      </div>
+
+      <p aria-live="polite" className="mt-3 min-h-5 text-xs tabular-nums text-muted">
+        {active ? (
+          describe(active)
+        ) : (
+          <span className="text-faint">Hover a block to see its interval.</span>
+        )}
       </p>
 
-      <div className="mt-4 overflow-x-auto">
-        <div style={{ minWidth: `${minWidth}px` }}>
-          <div className="relative h-16 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-            {result.gantt.map((segment, index) => {
-              const idle = segment.pid === "IDLE";
-              const left = (segment.start / total) * 100;
-              const width = ((segment.end - segment.start) / total) * 100;
+      <div className="overflow-x-auto pb-1">
+        <div className="min-w-full">
+          <div className="flex h-12 overflow-hidden rounded-lg ring-1 ring-line-soft">
+            {blocks.map((block) => {
+              const { segment } = block;
+              const idle = block.color === null;
 
               return (
-                <div
-                  key={`${segment.pid}-${segment.start}-${index}`}
-                  title={`${idle ? "Idle" : segment.pid}: ${segment.start} -> ${segment.end}`}
-                  className={`absolute inset-y-0 flex items-center justify-center overflow-hidden border-r border-white/70 text-sm font-semibold ${
-                    idle ? "hatch-idle text-slate-700" : "text-white"
+                <button
+                  key={`${segment.pid}-${segment.start}-${block.index}`}
+                  type="button"
+                  aria-label={describe(segment)}
+                  onMouseEnter={() => setActiveIndex(block.index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  onFocus={() => setActiveIndex(block.index)}
+                  onBlur={() => setActiveIndex(null)}
+                  className={`flex h-full items-center justify-center overflow-hidden border-r border-panel/80 text-xs font-medium transition-[filter] last:border-r-0 hover:brightness-110 focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 ${
+                    idle ? "hatch-idle text-muted" : "text-[#05070a]"
                   }`}
                   style={{
-                    left: `${left}%`,
-                    width: `${width}%`,
-                    backgroundColor: idle ? undefined : stableColor(segment.pid),
+                    flexGrow: block.duration,
+                    flexBasis: 0,
+                    minWidth: `${MIN_BLOCK_WIDTH}px`,
+                    backgroundColor: block.color ?? undefined,
                   }}
                 >
-                  <span className="truncate px-1">{idle ? "Idle" : segment.pid}</span>
-                </div>
+                  <span className="truncate px-1.5">{idle ? "Idle" : segment.pid}</span>
+                </button>
               );
             })}
           </div>
 
-          <div className="relative mt-2 h-5 text-xs text-slate-500">
-            {result.gantt.map((segment, index) => (
-              <span
-                key={`start-${segment.pid}-${segment.start}-${index}`}
-                className="absolute top-0"
-                style={{ left: `${(segment.start / total) * 100}%` }}
+          <div className="mt-1.5 flex h-5">
+            {blocks.map((block, index) => (
+              <div
+                key={`axis-${block.segment.pid}-${block.segment.start}-${block.index}`}
+                className="relative"
+                style={{
+                  flexGrow: block.duration,
+                  flexBasis: 0,
+                  minWidth: `${MIN_BLOCK_WIDTH}px`,
+                }}
               >
-                {segment.start}
-              </span>
+                {index === 0 && (
+                  <span className="absolute left-0 top-0 text-[10px] tabular-nums text-faint">
+                    0
+                  </span>
+                )}
+                <span
+                  aria-hidden="true"
+                  className="absolute right-0 top-0 h-1.5 w-px bg-line-strong"
+                />
+                <span className="absolute right-0 top-0 pr-1 text-[10px] tabular-nums text-faint">
+                  {block.segment.end}
+                </span>
+              </div>
             ))}
-            <span className="absolute right-0 top-0 font-medium text-slate-700">
-              {result.total_time}
-            </span>
           </div>
         </div>
       </div>

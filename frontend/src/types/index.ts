@@ -2,6 +2,8 @@
 
 export type Algorithm = "fcfs" | "sjf";
 
+export type BackendStatus = "checking" | "online" | "offline";
+
 export interface ProcessInput {
   pid: string;
   arrival: number;
