@@ -75,7 +75,14 @@ npm install
 # Backend: create the virtual environment and install dependencies
 cd backend
 python -m venv .venv
-.venv/bin/pip install -r requirements.txt      # Windows: .venv\Scripts\pip install -r requirements.txt
+
+  # Windows
+  .venv\Scripts\python -m pip install -r requirements.txt 
+
+  # Linux
+  .venv/bin/python -m pip install -r requirements.txt
+
+# Back to root folder
 cd ..
 
 # Frontend: install dependencies
@@ -98,7 +105,7 @@ Press Ctrl+C once to stop both.
 ### Run the servers separately (optional)
 ```bash
 # Terminal 1
-cd backend && .venv/bin/python -m uvicorn app.main:app --reload
+cd backend && .venv\Scripts\python -m uvicorn app.main:app --reload
 
 # Terminal 2
 cd frontend && npm run dev
