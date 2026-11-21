@@ -1,25 +1,16 @@
-# CPU Scheduling Simulator (Python/FastAPI version)
+# CPU Scheduling Simulator
 
-A full-stack CPU scheduling simulator for First-Come, First-Served (FCFS) and non-preemptive Shortest Job First (SJF). Enter processes in the browser or upload a CSV or JSON file, run a simulation, and inspect a proportional Gantt chart, per-process timing metrics, and CPU averages.
-
-The scheduling engine is pure Python with no web imports. The API is FastAPI with Pydantic validation, and the frontend is React, TypeScript, and Tailwind CSS.
+A web-based CPU scheduling simulator for CS16/L: Operating Systems final project. It simulates First-Come, First-Served (FCFS) and non-preemptive Shortest Job First (SJF) scheduling. Enter processes by hand or load them from a CSV or JSON file, choose an algorithm, and view the resulting Gantt chart, per-process timing table, and average CPU metrics.
 
 ## Features
 
-- FCFS and non-preemptive SJF scheduling
-- Up to 100 processes per run
-- PID, arrival time, burst time, and reserved priority input
-- Two-column dark interface: a 440 px input panel and a fluid results panel
-- Compact process table with a count stepper, add row, and remove row controls
-- Segmented FCFS and SJF picker with a description of the selected policy
-- Gantt chart with proportional segment widths, a ticked time axis, hover intervals, idle hatching, and per-PID colours
-- Per-process completion, turnaround, waiting, and response times
-- Average waiting time and average turnaround time, rounded to two decimals
-- Total simulated time
-- CSV and JSON drag-and-drop upload with specific parse errors and a 1 MB limit
-- Backend validation with row-specific messages shown inline and in a summary banner
-- Backend status chip, loading state, unreachable-server message, and responsive layout
-- Ctrl + Enter (or Cmd + Enter) to run a simulation
+- FCFS and non-preemptive SJF scheduling, selectable by the user
+- Process input: number of processes, PID, arrival time, burst time, and priority
+- Optional CSV or JSON file upload
+- Gantt chart showing CPU execution order with time intervals
+- Results table with completion, turnaround, waiting, and response time per process
+- CPU metrics: average waiting time and average turnaround time
+- Input validation with clear error messages (negative times, missing fields, duplicate PIDs, and more)
 
 ## Tech stack
 
@@ -62,10 +53,11 @@ cpu-scheduling-simulator/
 ├── sample_data/
 │   ├── sample.csv
 │   └── sample.json
+├── package.json                 root scripts: "npm run dev" starts backend and frontend together
 └── README.md
 ```
 
-## Setup
+## Getting Started
 
 ### Prerequisites
 
@@ -73,52 +65,44 @@ cpu-scheduling-simulator/
 - Node.js 20 or newer
 - npm
 
-### Backend
-
-From the repository root:
+### One-time setup
+From the project root:
 
 ```bash
+# Root: installs the tool that runs both servers together
+npm install
+
+# Backend: create the virtual environment and install dependencies
 cd backend
 python -m venv .venv
+.venv/bin/pip install -r requirements.txt      # Windows: .venv\Scripts\pip install -r requirements.txt
+cd ..
+
+# Frontend: install dependencies
+npm --prefix frontend install
 ```
 
-Activate the virtual environment.
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-macOS or Linux:
+### Run the app
+From the project root:
 
 ```bash
-source .venv/bin/activate
-```
-
-Install dependencies and start the development server:
-
-```bash
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-The API runs at `http://localhost:8000`.
-
-- Health check: `http://localhost:8000/api/health`
-- Interactive API docs: `http://localhost:8000/docs`
-
-### Frontend
-
-In a second terminal:
-
-```bash
-cd frontend
-npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite proxies `/api` requests to `http://localhost:8000`, and the backend also enables CORS for `http://localhost:5173`.
+This starts both servers in one terminal:
+- Frontend (open this in your browser): http://localhost:5173
+- Backend API: http://localhost:8000 (interactive docs at http://localhost:8000/docs)
+
+Press Ctrl+C once to stop both.
+
+### Run the servers separately (optional)
+```bash
+# Terminal 1
+cd backend && .venv/bin/python -m uvicorn app.main:app --reload
+
+# Terminal 2
+cd frontend && npm run dev
+```
 
 ## Running the tests
 
@@ -144,6 +128,10 @@ ruff check .
 ruff format --check .
 ```
 
+## Preview
+
+![alt text](image.png)
+
 ## Usage
 
 1. Choose FCFS or SJF from the segmented algorithm control. The line below it describes the selected policy.
@@ -160,79 +148,6 @@ Priority is collected and validated, but neither algorithm uses it.
 The "Clear all" button resets the form to one empty process row and removes any results, errors, and notices. The selected algorithm is kept.
 
 The header shows a backend status chip: checking, connected, or offline. It is checked on load, when the window regains focus, and after each simulation attempt.
-
-## API contract
-
-### `GET /api/health`
-
-Response:
-
-```json
-{ "status": "ok" }
-```
-
-### `POST /api/simulate`
-
-Request:
-
-```json
-{
-  "algorithm": "fcfs",
-  "processes": [
-    { "pid": "P1", "arrival": 0, "burst": 5, "priority": 2 }
-  ]
-}
-```
-
-`algorithm` must be `"fcfs"` or `"sjf"`. `priority` is optional and defaults to `0`.
-
-Success response, HTTP 200:
-
-```json
-{
-  "algorithm": "fcfs",
-  "gantt": [{ "pid": "P1", "start": 0, "end": 5 }],
-  "results": [
-    {
-      "pid": "P1",
-      "arrival": 0,
-      "burst": 5,
-      "priority": 2,
-      "completion": 5,
-      "turnaround": 5,
-      "waiting": 0,
-      "response": 0
-    }
-  ],
-  "averages": { "waiting": 0.0, "turnaround": 5.0 },
-  "total_time": 5
-}
-```
-
-Gantt segments are chronological. Results stay in the original input order.
-
-Validation errors return HTTP 422 with a flat list:
-
-```json
-{
-  "errors": [
-    { "row": 3, "field": "burst", "message": "Burst time must be greater than 0." },
-    { "row": null, "field": "algorithm", "message": "Algorithm must be 'fcfs' or 'sjf'." }
-  ]
-}
-```
-
-`row` is the 1-based process index, or `null` for request-level errors.
-
-### Validation rules
-
-- `processes` must contain 1 to 100 entries.
-- `pid` is required, trimmed, 1 to 20 characters, unique case-insensitively, and cannot be `IDLE` in any case.
-- `arrival` is a required integer from 0 to 100000.
-- `burst` is a required integer from 1 to 100000.
-- `priority` is optional and defaults to 0, but must be an integer of 0 or more when provided.
-- JSON floats, strings, booleans, and nulls are rejected for integer fields, including integral floats such as `5.0`.
-- Duplicate PIDs are reported on the later row.
 
 ## Upload formats
 
@@ -271,27 +186,6 @@ Upload rules:
 - CSV error rows use physical file line numbers. JSON errors use the 1-based array item number.
 - The parser checks structure and value types only. The backend enforces ranges, uniqueness, and reserved names.
 
-## Scheduling rules
-
-### Metrics
-
-- Completion Time (CT): the time the process finishes.
-- Turnaround Time (TAT): CT minus arrival time.
-- Waiting Time (WT): TAT minus burst time.
-- Response Time (RT): first CPU start minus arrival time.
-- Averages are rounded to two decimals.
-- Response time equals waiting time for both algorithms because neither algorithm preempts a running process, but both values are returned and displayed.
-
-### FCFS
-
-Processes are sorted by arrival time, with ties broken by original input index. Each process runs to completion. If the CPU is idle because the next process has not arrived, an `IDLE` segment fills the gap.
-
-### SJF, non-preemptive
-
-At each decision point, the scheduler considers unfinished processes with arrival time less than or equal to the current clock and picks the smallest burst. Ties are broken, in order, by earlier arrival time and then by original input index. A running process is never interrupted. If no process has arrived, an `IDLE` segment spans the gap to the earliest next arrival.
-
-Zero-length segments are never emitted. Consecutive segments belong to different processes because neither algorithm preempts.
-
 ## Verification dataset
 
 | PID | Arrival | Burst | Priority |
@@ -318,13 +212,3 @@ SJF results:
 - Average turnaround: 10.75
 
 Idle gap example: P1 with arrival 2 and burst 3, P2 with arrival 10 and burst 2 produces `IDLE 0-2, P1 2-5, IDLE 5-10, P2 10-12` for both algorithms.
-
-## Screenshots
-
-Screenshots of the input form, Gantt chart, results table, and validation messages will be added here.
-
-## Implementation notes
-
-- The backend test suite is intentionally consolidated into one file, `backend/tests/test.py`, as requested. Pytest is configured with `python_files = ["test.py"]`.
-- Integer fields accept JSON integers only. Integral floats such as `5.0` are rejected to keep the rule unambiguous.
-- The scheduler package does not import FastAPI or Pydantic. `run_algorithm(name, processes)` is the only entry point used by the API, and algorithms are registered in a dictionary.
